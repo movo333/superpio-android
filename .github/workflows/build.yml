@@ -8,7 +8,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,7 +21,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Gradle 8.3
+      - name: Install Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.3'
@@ -35,10 +34,6 @@ jobs:
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
-        with:
-          name: SuperPio-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 30        uses: actions/upload-artifact@v4
         with:
           name: SuperPio-APK
           path: app/build/outputs/apk/debug/app-debug.apk
