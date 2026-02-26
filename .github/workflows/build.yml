@@ -22,19 +22,23 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Force Gradle 8.3
-        run: |
-          sed -i 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-8.3-bin.zip|' gradle/wrapper/gradle-wrapper.properties
-          cat gradle/wrapper/gradle-wrapper.properties
+      - name: Install Gradle 8.3
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.3'
 
       - name: Make gradlew executable
         run: chmod +x gradlew
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug
+        run: gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
+        with:
+          name: SuperPio-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30        uses: actions/upload-artifact@v4
         with:
           name: SuperPio-APK
           path: app/build/outputs/apk/debug/app-debug.apk
