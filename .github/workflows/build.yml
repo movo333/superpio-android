@@ -1,4 +1,4 @@
-name: Build Super Pio AAB
+name: Build Super Pio APK
 
 on:
   push:
@@ -30,24 +30,13 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Build Release AAB
-        run: gradle bundleRelease
+      - name: Build Debug APK
+        run: gradle assembleDebug
 
-      - name: Sign AAB
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > superpio.keystore
-          jarsigner -verbose \
-            -sigalg SHA256withRSA \
-            -digestalg SHA-256 \
-            -keystore superpio.keystore \
-            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
-            -keypass "${{ secrets.KEY_PASSWORD }}" \
-            app/build/outputs/bundle/release/app-release.aab \
-            "${{ secrets.KEY_ALIAS }}"
-
-      - name: Upload AAB
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: SuperPio-AAB
-          path: app/build/outputs/bundle/release/app-release.aab
+          name: SuperPio-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
+          
