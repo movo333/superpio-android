@@ -61,36 +61,5 @@ public class MainActivity extends Activity {
 
     @Override protected void onResume() { super.onResume(); webView.onResume(); }
     @Override protected void onPause() { super.onPause(); webView.onPause(); }
-}
-        webView.addJavascriptInterface(new Object() {
-            @android.webkit.JavascriptInterface
-            public void exitApp() {
-                finish();
             }
-        }, "AndroidBridge");
-
-        webView.loadUrl(GAME_URL);
-    }
-
-    @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        // زر الرجوع — يظهر dialog الخروج
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            webView.evaluateJavascript("showExitDialog()", null);
-            return true;
-        }
-        return super.onKeyDown(keyCode, event);
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        webView.onResume();
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        webView.onPause();
-    }
-}
+    
