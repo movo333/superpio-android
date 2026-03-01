@@ -63,36 +63,15 @@ public class MainActivity extends Activity {
         return super.onKeyDown(keyCode, event);
     }
 
-    @Override protected void onResume() { super.onResume(); webView.onResume(); }
-    @Override protected void onPause() { super.onPause(); webView.onPause(); }
-}
-        settings.setAllowFileAccess(true);
-        settings.setAllowFileAccessFromFileURLs(true);
-        settings.setAllowUniversalAccessFromFileURLs(true);
-        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-
-        webView.setWebViewClient(new WebViewClient());
-        webView.setWebChromeClient(new WebChromeClient());
-
-        webView.addJavascriptInterface(new Object() {
-            @android.webkit.JavascriptInterface
-            public void exitApp() { finish(); }
-        }, "AndroidBridge");
-
-        webView.loadUrl(GAME_URL);
+    @Override
+    protected void onResume() {
+        super.onResume();
+        webView.onResume();
     }
 
     @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            webView.evaluateJavascript("showExitDialog()", null);
-            return true;
-        }
-        return super.onKeyDown(keyCode, event);
+    protected void onPause() {
+        super.onPause();
+        webView.onPause();
     }
-
-    @Override protected void onResume() { super.onResume(); webView.onResume(); }
-    @Override protected void onPause() { super.onPause(); webView.onPause(); }
-            }
-
-            
+}
