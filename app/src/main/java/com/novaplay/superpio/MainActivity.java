@@ -32,8 +32,40 @@ public class MainActivity extends Activity {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
+        settings.setDatabaseEnabled(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
-        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+
+        // ── الكاش: استخدم المحفوظ أولاً، الشبكة فقط إذا لم يوجد ──
+        settings.setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
+
+        settings.setAllowFileAccess(true);
+        settings.setAllowFileAccessFromFileURLs(true);
+        settings.setAllowUniversalAccessFromFileURLs(true);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+
+        webView.setWebViewClient(new WebViewClient());
+        webView.setWebChromeClient(new WebChromeClient());
+
+        webView.addJavascriptInterface(new Object() {
+            @android.webkit.JavascriptInterface
+            public void exitApp() { finish(); }
+        }, "AndroidBridge");
+
+        webView.loadUrl(GAME_URL);
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            webView.evaluateJavascript("showExitDialog()", null);
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override protected void onResume() { super.onResume(); webView.onResume(); }
+    @Override protected void onPause() { super.onPause(); webView.onPause(); }
+}
         settings.setAllowFileAccess(true);
         settings.setAllowFileAccessFromFileURLs(true);
         settings.setAllowUniversalAccessFromFileURLs(true);
