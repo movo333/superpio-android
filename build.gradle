@@ -20,9 +20,7 @@ android {
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
-        debug {
-            minifyEnabled false
-        }
+        debug { minifyEnabled false }
     }
 
     compileOptions {
@@ -39,4 +37,5 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.webkit:webkit:1.8.0'
     implementation 'com.android.billingclient:billing:6.2.0'
+    implementation 'com.google.android.gms:play-services-ads:23.0.0'
 }
