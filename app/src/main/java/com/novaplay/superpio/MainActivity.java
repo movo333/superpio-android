@@ -16,24 +16,45 @@ import android.view.View;
 import android.os.Build;
 import android.util.Log;
 import androidx.webkit.WebViewAssetLoader;
+import androidx.annotation.NonNull;
+
+// Google Play Billing
 import com.android.billingclient.api.*;
+
+// AdMob
+import com.google.android.gms.ads.AdError;
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.FullScreenContentCallback;
+import com.google.android.gms.ads.LoadAdError;
+import com.google.android.gms.ads.MobileAds;
+import com.google.android.gms.ads.rewarded.RewardedAd;
+import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback;
+import com.google.android.gms.ads.interstitial.InterstitialAd;
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback;
+
 import java.util.Arrays;
 import java.util.List;
 
 public class MainActivity extends Activity implements PurchasesUpdatedListener {
 
     private static final String TAG = "SuperPio";
+
+    // ── AdMob IDs ──
+    private static final String ADMOB_APP_ID    = "ca-app-pub-1152901043073265~9762922173";
+    private static final String ADMOB_REWARD_ID = "ca-app-pub-1152901043073265/9821943568";
+    private static final String ADMOB_SPLASH_ID = "ca-app-pub-1152901043073265/3720258008";
+
     private WebView webView;
     private WebViewAssetLoader assetLoader;
-    private BillingClient billingClient;
 
-    // IDs المنتجات - يجب أن تطابق ما أنشأته في Play Console
-    private static final List<String> PRODUCT_IDS = Arrays.asList(
-        "next_level",
-        "all_levels",
-        "coins_1000",
-        "hearts_20"
-    );
+    // AdMob
+    private RewardedAd rewardedAd;
+    private InterstitialAd splashAd;
+    private boolean adLoading = false;
+    private String pendingRewardType = null;
+
+    // Billing
+    private BillingClient billingClient;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,32 +66,32 @@ public class MainActivity extends Activity implements PurchasesUpdatedListener {
             WindowManager.LayoutParams.FLAG_FULLSCREEN
         );
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-
         hideSystemUI();
 
-        // إعداد Billing Client
+        // ── تهيئة AdMob ──
+        MobileAds.initialize(this, initStatus -> {
+            Log.d(TAG, "AdMob initialized");
+            loadRewardedAd();
+            loadSplashAd();
+        });
+
+        // ── تهيئة Billing ──
         billingClient = BillingClient.newBuilder(this)
             .setListener(this)
             .enablePendingPurchases()
             .build();
-
-        // الاتصال بـ Google Play
         billingClient.startConnection(new BillingClientStateListener() {
             @Override
-            public void onBillingSetupFinished(BillingResult result) {
-                if (result.getResponseCode() == BillingClient.BillingResponseCode.OK) {
-                    Log.d(TAG, "Billing connected");
-                    // تحقق من المشتريات السابقة غير المكتملة
+            public void onBillingSetupFinished(BillingResult r) {
+                if (r.getResponseCode() == BillingClient.BillingResponseCode.OK) {
                     checkPendingPurchases();
                 }
             }
             @Override
-            public void onBillingServiceDisconnected() {
-                Log.d(TAG, "Billing disconnected");
-            }
+            public void onBillingServiceDisconnected() {}
         });
 
-        // WebViewAssetLoader
+        // ── WebView ──
         assetLoader = new WebViewAssetLoader.Builder()
             .setDomain("appassets.androidplatform.net")
             .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
@@ -79,153 +100,209 @@ public class MainActivity extends Activity implements PurchasesUpdatedListener {
         webView = new WebView(this);
         setContentView(webView);
 
-        WebSettings settings = webView.getSettings();
-        settings.setJavaScriptEnabled(true);
-        settings.setDomStorageEnabled(true);
-        settings.setDatabaseEnabled(true);
-        settings.setMediaPlaybackRequiresUserGesture(false);
-        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
-        settings.setAllowFileAccess(true);
-        settings.setAllowContentAccess(true);
-        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        WebSettings s = webView.getSettings();
+        s.setJavaScriptEnabled(true);
+        s.setDomStorageEnabled(true);
+        s.setDatabaseEnabled(true);
+        s.setMediaPlaybackRequiresUserGesture(false);
+        s.setCacheMode(WebSettings.LOAD_DEFAULT);
+        s.setAllowFileAccess(true);
+        s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
-            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                WebResourceResponse response = assetLoader.shouldInterceptRequest(request.getUrl());
-                if (response != null) return response;
-                return super.shouldInterceptRequest(view, request);
+            public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest req) {
+                WebResourceResponse r = assetLoader.shouldInterceptRequest(req.getUrl());
+                return r != null ? r : super.shouldInterceptRequest(v, req);
             }
-
             @Override
-            public void onPageFinished(WebView view, String url) {
-                super.onPageFinished(view, url);
+            public void onPageFinished(WebView v, String url) {
+                super.onPageFinished(v, url);
                 hideSystemUI();
             }
         });
 
         webView.setWebChromeClient(new WebChromeClient());
-
-        // JavascriptInterface - الجسر بين JS و Java
-        webView.addJavascriptInterface(new BillingBridge(), "AndroidBilling");
-
+        webView.addJavascriptInterface(new GameBridge(), "AndroidBridge");
         webView.loadUrl("https://appassets.androidplatform.net/assets/index.html");
     }
 
-    // ═══════════════════════════════════════
-    // الجسر بين JavaScript و Google Play
-    // ═══════════════════════════════════════
-    private class BillingBridge {
+    // ══════════════════════════════════════════
+    // الجسر بين JavaScript والـ Native
+    // ══════════════════════════════════════════
+    private class GameBridge {
 
-        // استدعاء من JS لبدء الشراء
+        // ── إعلان المكافأة ──
+        @JavascriptInterface
+        public void showRewardedAd(String rewardType) {
+            pendingRewardType = rewardType;
+            runOnUiThread(() -> {
+                if (rewardedAd != null) {
+                    rewardedAd.show(MainActivity.this, rewardItem -> {
+                        // المستخدم شاهد الإعلان كاملاً
+                        Log.d(TAG, "Reward earned: " + rewardType);
+                        notifyJS("onAdRewarded", rewardType);
+                        loadRewardedAd(); // تحميل إعلان جديد
+                    });
+                } else {
+                    // لا يوجد إعلان جاهز - أعطِ المكافأة مباشرة
+                    Log.d(TAG, "No ad ready, giving reward directly");
+                    notifyJS("onAdRewarded", rewardType);
+                    loadRewardedAd();
+                }
+            });
+        }
+
+        // ── إعلان Splash ──
+        @JavascriptInterface
+        public void showSplashAd() {
+            runOnUiThread(() -> {
+                if (splashAd != null) {
+                    splashAd.show(MainActivity.this);
+                    splashAd = null;
+                    loadSplashAd();
+                }
+            });
+        }
+
+        // ── هل الإعلان جاهز ──
+        @JavascriptInterface
+        public boolean isAdReady() {
+            return rewardedAd != null;
+        }
+
+        // ── شراء IAP ──
         @JavascriptInterface
         public void purchase(String productId) {
-            Log.d(TAG, "Purchase requested: " + productId);
-
             if (!billingClient.isReady()) {
-                notifyJS("error", productId, "Billing not ready");
+                notifyJS("onPurchaseResult", "error|" + productId);
                 return;
             }
-
-            // جلب تفاصيل المنتج من Google Play
             QueryProductDetailsParams params = QueryProductDetailsParams.newBuilder()
                 .setProductList(Arrays.asList(
                     QueryProductDetailsParams.Product.newBuilder()
                         .setProductId(productId)
                         .setProductType(BillingClient.ProductType.INAPP)
                         .build()
-                ))
-                .build();
+                )).build();
 
-            billingClient.queryProductDetailsAsync(params, (billingResult, productDetailsList) -> {
-                if (billingResult.getResponseCode() != BillingClient.BillingResponseCode.OK
-                        || productDetailsList.isEmpty()) {
-                    notifyJS("error", productId, "Product not found");
+            billingClient.queryProductDetailsAsync(params, (result, list) -> {
+                if (result.getResponseCode() != BillingClient.BillingResponseCode.OK || list.isEmpty()) {
+                    notifyJS("onPurchaseResult", "error|" + productId);
                     return;
                 }
-
-                // فتح شاشة الدفع
-                BillingFlowParams flowParams = BillingFlowParams.newBuilder()
+                BillingFlowParams flow = BillingFlowParams.newBuilder()
                     .setProductDetailsParamsList(Arrays.asList(
                         BillingFlowParams.ProductDetailsParams.newBuilder()
-                            .setProductDetails(productDetailsList.get(0))
+                            .setProductDetails(list.get(0))
                             .build()
-                    ))
-                    .build();
-
-                runOnUiThread(() ->
-                    billingClient.launchBillingFlow(MainActivity.this, flowParams)
-                );
+                    )).build();
+                runOnUiThread(() -> billingClient.launchBillingFlow(MainActivity.this, flow));
             });
         }
 
-        // إغلاق التطبيق
+        // ── إغلاق التطبيق ──
         @JavascriptInterface
-        public void exitApp() {
-            finish();
-        }
+        public void exitApp() { finish(); }
     }
 
-    // ═══════════════════════════════════════
-    // نتيجة الشراء
-    // ═══════════════════════════════════════
+    // ══════════════════════════════════════════
+    // تحميل الإعلانات
+    // ══════════════════════════════════════════
+    private void loadRewardedAd() {
+        if (adLoading) return;
+        adLoading = true;
+        AdRequest req = new AdRequest.Builder().build();
+        RewardedAd.load(this, ADMOB_REWARD_ID, req, new RewardedAdLoadCallback() {
+            @Override
+            public void onAdLoaded(@NonNull RewardedAd ad) {
+                rewardedAd = ad;
+                adLoading = false;
+                Log.d(TAG, "Rewarded ad loaded");
+
+                rewardedAd.setFullScreenContentCallback(new FullScreenContentCallback() {
+                    @Override
+                    public void onAdDismissedFullScreenContent() {
+                        rewardedAd = null;
+                        loadRewardedAd();
+                    }
+                    @Override
+                    public void onAdFailedToShowFullScreenContent(@NonNull AdError e) {
+                        rewardedAd = null;
+                        loadRewardedAd();
+                    }
+                });
+            }
+            @Override
+            public void onAdFailedToLoad(@NonNull LoadAdError e) {
+                rewardedAd = null;
+                adLoading = false;
+                Log.e(TAG, "Rewarded ad failed: " + e.getMessage());
+            }
+        });
+    }
+
+    private void loadSplashAd() {
+        AdRequest req = new AdRequest.Builder().build();
+        InterstitialAd.load(this, ADMOB_SPLASH_ID, req, new InterstitialAdLoadCallback() {
+            @Override
+            public void onAdLoaded(@NonNull InterstitialAd ad) {
+                splashAd = ad;
+                Log.d(TAG, "Splash ad loaded");
+            }
+            @Override
+            public void onAdFailedToLoad(@NonNull LoadAdError e) {
+                splashAd = null;
+                Log.e(TAG, "Splash ad failed: " + e.getMessage());
+            }
+        });
+    }
+
+    // ══════════════════════════════════════════
+    // Billing - نتيجة الشراء
+    // ══════════════════════════════════════════
     @Override
     public void onPurchasesUpdated(BillingResult result, List<Purchase> purchases) {
         if (result.getResponseCode() == BillingClient.BillingResponseCode.OK && purchases != null) {
-            for (Purchase purchase : purchases) {
-                handlePurchase(purchase);
-            }
-        } else if (result.getResponseCode() == BillingClient.BillingResponseCode.USER_CANCELED) {
-            Log.d(TAG, "Purchase cancelled");
-        } else {
-            Log.e(TAG, "Purchase error: " + result.getDebugMessage());
+            for (Purchase p : purchases) handlePurchase(p);
         }
     }
 
     private void handlePurchase(Purchase purchase) {
         if (purchase.getPurchaseState() != Purchase.PurchaseState.PURCHASED) return;
-
         String productId = purchase.getProducts().get(0);
-        Log.d(TAG, "Purchase success: " + productId);
 
-        // تأكيد الشراء لـ Google Play (مطلوب وإلا يُسترد المال)
-        ConsumeParams consumeParams = ConsumeParams.newBuilder()
+        ConsumeParams cp = ConsumeParams.newBuilder()
             .setPurchaseToken(purchase.getPurchaseToken())
             .build();
-
-        billingClient.consumeAsync(consumeParams, (billingResult, purchaseToken) -> {
-            if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK) {
-                // أبلغ JS بنجاح الشراء
-                notifyJS("success", productId, "");
+        billingClient.consumeAsync(cp, (r, token) -> {
+            if (r.getResponseCode() == BillingClient.BillingResponseCode.OK) {
+                notifyJS("onPurchaseResult", "success|" + productId);
             }
         });
     }
 
-    // تحقق من مشتريات لم تكتمل
     private void checkPendingPurchases() {
         billingClient.queryPurchasesAsync(
             QueryPurchasesParams.newBuilder()
-                .setProductType(BillingClient.ProductType.INAPP)
-                .build(),
-            (billingResult, purchases) -> {
-                if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK) {
-                    for (Purchase purchase : purchases) {
-                        handlePurchase(purchase);
-                    }
-                }
-            }
+                .setProductType(BillingClient.ProductType.INAPP).build(),
+            (r, list) -> { for (Purchase p : list) handlePurchase(p); }
         );
     }
 
-    // إرسال نتيجة الشراء لـ JavaScript
-    private void notifyJS(final String status, final String productId, final String error) {
-        runOnUiThread(() -> {
-            String js = "if(typeof onAndroidPurchase==='function')" +
-                "onAndroidPurchase('" + status + "','" + productId + "','" + error + "');";
-            webView.evaluateJavascript(js, null);
-        });
+    // ══════════════════════════════════════════
+    // إرسال نتيجة لـ JavaScript
+    // ══════════════════════════════════════════
+    private void notifyJS(final String fn, final String data) {
+        runOnUiThread(() ->
+            webView.evaluateJavascript(
+                "if(typeof " + fn + "==='function')" + fn + "('" + data + "');", null)
+        );
     }
 
+    // ══════════════════════════════════════════
+    // UI
+    // ══════════════════════════════════════════
     private void hideSystemUI() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             webView.setSystemUiVisibility(
@@ -239,39 +316,16 @@ public class MainActivity extends Activity implements PurchasesUpdatedListener {
         }
     }
 
-    @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) hideSystemUI();
-    }
-
-    @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            webView.evaluateJavascript(
-                "if(typeof showExitDialog==='function')showExitDialog();", null);
+    @Override public void onWindowFocusChanged(boolean h) { super.onWindowFocusChanged(h); if(h) hideSystemUI(); }
+    @Override public boolean onKeyDown(int k, KeyEvent e) {
+        if (k == KeyEvent.KEYCODE_BACK) {
+            webView.evaluateJavascript("if(typeof showExitDialog==='function')showExitDialog();", null);
             return true;
         }
-        return super.onKeyDown(keyCode, event);
+        return super.onKeyDown(k, e);
     }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        webView.onResume();
-        hideSystemUI();
+    @Override protected void onResume()  { super.onResume();  webView.onResume();  hideSystemUI(); }
+    @Override protected void onPause()   { super.onPause();   webView.onPause(); }
+    @Override protected void onDestroy() { if(billingClient!=null) billingClient.endConnection(); super.onDestroy(); }
     }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        webView.onPause();
-    }
-
-    @Override
-    protected void onDestroy() {
-        if (billingClient != null) billingClient.endConnection();
-        super.onDestroy();
-    }
-                              }
-                    
+            
