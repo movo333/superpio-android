@@ -1,4 +1,4 @@
-name: Build AAB
+name: Build APK
 
 on:
   workflow_dispatch:
@@ -27,22 +27,13 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Build Release AAB
-        run: gradle bundleRelease
+      - name: Build Debug APK
+        run: gradle assembleDebug
 
-      - name: Sign AAB
-        uses: r0adkll/sign-android-release@v1
-        with:
-          releaseDirectory: app/build/outputs/bundle/release
-          signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
-          alias: ${{ secrets.KEY_ALIAS }}
-          keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
-          keyPassword: ${{ secrets.KEY_PASSWORD }}
-
-      - name: Upload AAB
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: SuperPio-AAB
-          path: app/build/outputs/bundle/release/app-release.aab
+          name: SuperPio-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
           
