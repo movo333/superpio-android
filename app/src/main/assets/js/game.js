@@ -574,10 +574,8 @@ function _syncInBackground() {
 }
 
 // ── مزامنة عند العودة للإنترنت ──
-window.addEventListener('online', () => {
-  console.log('[Net] Back online — syncing...');
-  _doCloudSave();
-});
+// تم إيقاف المزامنة التلقائية لتحسين الأداء
+// window.addEventListener('online', () => { _doCloudSave(); });
 
 // ══════════════════════════════════════════════════════
 //  PI NETWORK — Authentication & Payments
@@ -633,7 +631,7 @@ function checkSavedLogin() {
       const badge = document.getElementById('piUserBadge');
       if (badge) { badge.textContent = GS.user.name; badge.style.display = 'block'; }
       // مزامنة خلفية صامتة بعد 3 ثوانٍ
-      setTimeout(() => _syncInBackground(), 3000);
+      // setTimeout(() => _syncInBackground(), 3000); // موقوف لتحسين الأداء
       return true;
     } catch(e) {}
   }
