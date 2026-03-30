@@ -22,7 +22,7 @@ const SUPA_URL = 'https://xwkosqpxfihgprfququw.supabase.co';
 
 // مسار الأصول حسب البيئة
 const IS_LOCAL = (typeof window !== 'undefined' && window.location.protocol === 'file:');
-const ASSET_BASE = IS_LOCAL ? 'file:///android_asset/' : '';
+const ASSET_BASE = IS_LOCAL ? '/assets/' : '';
 const SUPA_KEY = 'sb_publishable_TA1liFGVpi9Sw1HoTJz24Q_lg_3XvHv';
 
 // ── AUDIO SYSTEM ──
@@ -30,7 +30,7 @@ const SUPA_KEY = 'sb_publishable_TA1liFGVpi9Sw1HoTJz24Q_lg_3XvHv';
 // وpool بسيط للباقي
 const SFX = (() => {
   const BASE = (typeof window !== 'undefined' && window.location && window.location.protocol === 'file:')
-    ? 'file:///android_asset/sounds/'
+    ? '/assets/sounds/'
     : 'sounds/';
   const MAP = {
     coin:      'coin.ogg',
@@ -247,13 +247,9 @@ function setupRotation() {
 
 // ── IMAGE LOADER (نسختان: حرجة وخلفية) ──
 function resolveAssetPath(src) {
-  if (typeof window !== 'undefined' && window.location && window.location.protocol === 'file:') {
-    if (!src.startsWith('file:') && !src.startsWith('http') && !src.startsWith('data:')) {
-      const clean = src;
-      return 'file:///android_asset/' + clean;
-    }
-  }
-  return src;
+  if (!src || src.startsWith('http') || src.startsWith('data:') || src.startsWith('/assets/')) return src;
+  if (src.startsWith('assets/')) return '/' + src;
+  return '/assets/' + src;
 }
 
 function loadImg(src) {
@@ -297,29 +293,29 @@ async function loadCriticalAssets() {
   for (const [anim, count] of Object.entries(anims)) {
     SPR[anim] = [];
     for (let i = 1; i <= count; i++) {
-      proms.push(loadImg(`file:///android_asset/character/${anim}${i}.png`).then(img => { SPR[anim][i-1] = img; }));
+      proms.push(loadImg(`/assets/character/${anim}${i}.png`).then(img => { SPR[anim][i-1] = img; }));
     }
   }
 
   // أعداء العالم 1 فقط: snail1, bat1, tuca1
   ['snail1','bat1','tuca1'].forEach(e =>
-    proms.push(loadImg(`file:///android_asset/enemies/${e}.png`).then(img => { SPR[e] = img; }))
+    proms.push(loadImg(`/assets/enemies/${e}.png`).then(img => { SPR[e] = img; }))
   );
 
   // صور بلاطات العالم 1 (nature) فقط
   TILE_IMGS['nature'] = {};
   for (let i = 1; i <= 18; i++) {
-    proms.push(loadImg(`file:///android_asset/tiles/nature/${i}.png`).then(img => { TILE_IMGS['nature'][i] = img; }));
+    proms.push(loadImg(`/assets/tiles/nature/${i}.png`).then(img => { TILE_IMGS['nature'][i] = img; }));
   }
 
   // خلفية العالم 1 + UI أساسية
-  proms.push(loadImg('file:///android_asset/bg/nature_bg.png').then(img => { UI_IMGS.bg_nature = img; }));
-  proms.push(loadImg('file:///android_asset/ui/splash_screen.png').then(img => { UI_IMGS.splash = img; }));
-  proms.push(loadImg('file:///android_asset/ui/sky_bg.png').then(img => { UI_IMGS.sky_bg = img; }));
-  proms.push(loadImg('file:///android_asset/ui/world_nature.png').then(img => { UI_IMGS.world_nature = img; }));
-  proms.push(loadImg('file:///android_asset/ui/world_graveyard.png').then(img => { UI_IMGS.world_graveyard = img; }));
-  proms.push(loadImg('file:///android_asset/ui/world_winter.png').then(img => { UI_IMGS.world_winter = img; }));
-  proms.push(loadImg('file:///android_asset/ui/world_desert.png').then(img => { UI_IMGS.world_desert = img; }));
+  proms.push(loadImg('/assets/bg/nature_bg.png').then(img => { UI_IMGS.bg_nature = img; }));
+  proms.push(loadImg('/assets/ui/splash_screen.png').then(img => { UI_IMGS.splash = img; }));
+  proms.push(loadImg('/assets/ui/sky_bg.png').then(img => { UI_IMGS.sky_bg = img; }));
+  proms.push(loadImg('/assets/ui/world_nature.png').then(img => { UI_IMGS.world_nature = img; }));
+  proms.push(loadImg('/assets/ui/world_graveyard.png').then(img => { UI_IMGS.world_graveyard = img; }));
+  proms.push(loadImg('/assets/ui/world_winter.png').then(img => { UI_IMGS.world_winter = img; }));
+  proms.push(loadImg('/assets/ui/world_desert.png').then(img => { UI_IMGS.world_desert = img; }));
 
   // أزرار التحكم الأساسية
   ['coin','bullet','banner_win','banner_lose','btn_retry','btn_shoot',
@@ -328,14 +324,14 @@ async function loadCriticalAssets() {
                    'btn_shoot','btn_left','btn_right','btn_jump','restart_btn'];
     const files  = ['coin.png','bullet.png','banner_win.png','banner_lose.png','btn_retry.png',
                     'btn_shoot.png','btn_left.png','btn_right.png','btn_Jumping.png','Restart_button.png'];
-    proms.push(loadImg('file:///android_asset/ui/' + files[i]).then(img => { UI_IMGS[keys2[i]] = img; }));
+    proms.push(loadImg('/assets/ui/' + files[i]).then(img => { UI_IMGS[keys2[i]] = img; }));
   });
 
   // ديكور العالم 1
   OBJ_IMGS['nature'] = {};
   const nat = ['Tree_1.png','Tree_2.png','Tree_3.png','Bush__1_.png','Bush__2_.png',
                'Bush__3_.png','Mushroom_1.png','Mushroom_2.png','Stone.png','Crate.png'];
-  nat.forEach(o => proms.push(loadImg(`file:///android_asset/objects/nature/${o}`).then(img => { OBJ_IMGS['nature'][o] = img; })));
+  nat.forEach(o => proms.push(loadImg(`/assets/objects/nature/${o}`).then(img => { OBJ_IMGS['nature'][o] = img; })));
 
   // ── تحميل كل العوالم كاملاً قبل الفتح ──
 
@@ -343,7 +339,7 @@ async function loadCriticalAssets() {
   ['bat2','bat3','snail2','snail3',
    'spikebee1','spikebee2','spikebee3','spikebee4',
    'tuca2','tuca3'].forEach(e =>
-    proms.push(loadImg(`file:///android_asset/enemies/${e}.png`).then(img => { SPR[e] = img; }))
+    proms.push(loadImg(`/assets/enemies/${e}.png`).then(img => { SPR[e] = img; }))
   );
 
   // بلاطات العوالم 2-4
@@ -355,17 +351,17 @@ async function loadCriticalAssets() {
   for (const [world, count] of Object.entries(rest)) {
     TILE_IMGS[world] = {};
     for (let i = 1; i <= count; i++) {
-      proms.push(loadImg(`file:///android_asset/tiles/${world}/${i}.png`).then(img => { TILE_IMGS[world][i] = img; }));
+      proms.push(loadImg(`/assets/tiles/${world}/${i}.png`).then(img => { TILE_IMGS[world][i] = img; }));
     }
   }
   // عظام المقبرة
   for (let b = 1; b <= 4; b++) {
-    proms.push(loadImg(`file:///android_asset/tiles/graveyard/bone${b}.png`).then(img => { TILE_IMGS['graveyard']['bone'+b] = img; }));
+    proms.push(loadImg(`/assets/tiles/graveyard/bone${b}.png`).then(img => { TILE_IMGS['graveyard']['bone'+b] = img; }));
   }
 
   // خلفيات العوالم 2-4
   ['graveyard','winter','desert'].forEach(w => {
-    proms.push(loadImg(`file:///android_asset/bg/${w}_bg.png`).then(img => { UI_IMGS['bg_'+w] = img; }));
+    proms.push(loadImg(`/assets/bg/${w}_bg.png`).then(img => { UI_IMGS['bg_'+w] = img; }));
   });
 
   // ديكور العوالم 2-4
@@ -376,33 +372,33 @@ async function loadCriticalAssets() {
   };
   for (const [world, items] of Object.entries(decoSets)) {
     OBJ_IMGS[world] = {};
-    items.forEach(o => proms.push(loadImg(`file:///android_asset/objects/${world}/${o}`).then(img => { OBJ_IMGS[world][o] = img; })));
+    items.forEach(o => proms.push(loadImg(`/assets/objects/${world}/${o}`).then(img => { OBJ_IMGS[world][o] = img; })));
   }
 
   // ── أزرار إضافية ──
   ['btn_play.png','heart.png','lock.png','star.png',
    'btn_back.png','Picsa8.png','banner_win(Copy).png'].forEach(f => {
     const key = f.replace(/\.[^.]+$/, '').replace(/[()]/g,'');
-    proms.push(loadImg('file:///android_asset/ui/' + f).then(img => { if(img) UI_IMGS[key] = img; }));
+    proms.push(loadImg('/assets/ui/' + f).then(img => { if(img) UI_IMGS[key] = img; }));
   });
 
   // ── صور المتجر ──
   ['ammo.png','lives.png','coins.png','unlock.png',
    'iap_next_level.png','iap_all_levels.png','iap_coins.png','iap_hearts.png'].forEach(f => {
     const key = 'shop_' + f.replace(/\.[^.]+$/, '');
-    proms.push(loadImg('file:///android_asset/shop/' + f).then(img => { if(img) UI_IMGS[key] = img; }));
+    proms.push(loadImg('/assets/shop/' + f).then(img => { if(img) UI_IMGS[key] = img; }));
   });
 
   // ── صور UI إضافية ──
   ['levels_panel.png','lock_panel.png'].forEach(f => {
     const key = f.replace(/\.[^.]+$/, '').replace(/_/g,'_');
-    proms.push(loadImg('file:///android_asset/ui/' + f).then(img => { if(img) UI_IMGS[key] = img; }));
+    proms.push(loadImg('/assets/ui/' + f).then(img => { if(img) UI_IMGS[key] = img; }));
   });
 
   // Picsa8 مع fallback
-  proms.push(loadImg('file:///android_asset/ui/Picsa8.png').then(img => {
+  proms.push(loadImg('/assets/ui/Picsa8.png').then(img => {
     if (img) UI_IMGS.picsa8 = img;
-    else return loadImg('file:///android_asset/ui/banner_win(Copy).png').then(i => { if(i) UI_IMGS.picsa8 = i; });
+    else return loadImg('/assets/ui/banner_win(Copy).png').then(i => { if(i) UI_IMGS.picsa8 = i; });
   }));
 
   // انتظر حتى يكتمل كل شيء (أو 30 ثانية كحد أقصى)
@@ -574,8 +570,10 @@ function _syncInBackground() {
 }
 
 // ── مزامنة عند العودة للإنترنت ──
-// تم إيقاف المزامنة التلقائية لتحسين الأداء
-// window.addEventListener('online', () => { _doCloudSave(); });
+window.addEventListener('online', () => {
+  console.log('[Net] Back online — syncing...');
+  _doCloudSave();
+});
 
 // ══════════════════════════════════════════════════════
 //  PI NETWORK — Authentication & Payments
@@ -631,7 +629,7 @@ function checkSavedLogin() {
       const badge = document.getElementById('piUserBadge');
       if (badge) { badge.textContent = GS.user.name; badge.style.display = 'block'; }
       // مزامنة خلفية صامتة بعد 3 ثوانٍ
-      // setTimeout(() => _syncInBackground(), 3000); // موقوف لتحسين الأداء
+      setTimeout(() => _syncInBackground(), 3000);
       return true;
     } catch(e) {}
   }
