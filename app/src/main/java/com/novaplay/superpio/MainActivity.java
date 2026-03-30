@@ -2,6 +2,7 @@ package com.novaplay.superpio;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.net.Uri;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.WebSettings;
@@ -16,6 +17,7 @@ import android.view.View;
 import android.os.Build;
 import android.util.Log;
 import androidx.annotation.NonNull;
+import androidx.webkit.WebViewAssetLoader;
 
 import com.android.billingclient.api.*;
 import com.google.android.gms.ads.*;
@@ -31,6 +33,8 @@ public class MainActivity extends Activity implements PurchasesUpdatedListener {
     private static final String ADMOB_REWARD_ID = "ca-app-pub-1152901043073265/9821943568";
     private static final String ADMOB_SPLASH_ID = "ca-app-pub-1152901043073265/3720258008";
 
+    // WebViewAssetLoader يحمل من assets عبر https بدل file://
+    private WebViewAssetLoader assetLoader;
     private WebView webView;
     private RewardedAd rewardedAd;
     private InterstitialAd splashAd;
@@ -50,8 +54,14 @@ public class MainActivity extends Activity implements PurchasesUpdatedListener {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         } catch (Exception e) {}
 
-        // ── WebView أولاً ──
+        // ── WebView ──
         try {
+            // WebViewAssetLoader - آمن ومتوافق مع سياسة Google
+            assetLoader = new WebViewAssetLoader.Builder()
+                .setDomain("appassets.androidplatform.net")
+                .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+                .build();
+
             webView = new WebView(this);
             setContentView(webView);
 
@@ -60,13 +70,19 @@ public class MainActivity extends Activity implements PurchasesUpdatedListener {
             s.setDomStorageEnabled(true);
             s.setDatabaseEnabled(true);
             s.setMediaPlaybackRequiresUserGesture(false);
-            s.setCacheMode(WebSettings.LOAD_NO_CACHE);
-            s.setAllowFileAccess(true);
-            s.setAllowFileAccessFromFileURLs(true);
-            s.setAllowUniversalAccessFromFileURLs(true);
-            s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+            s.setCacheMode(WebSettings.LOAD_DEFAULT);
+            // لا نستخدم setAllowFileAccessFromFileURLs - محظور في سياسة Google
+            s.setAllowFileAccess(false);
 
             webView.setWebViewClient(new WebViewClient() {
+                @Override
+                public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest req) {
+                    try {
+                        WebResourceResponse r = assetLoader.shouldInterceptRequest(req.getUrl());
+                        if (r != null) return r;
+                    } catch (Exception e) {}
+                    return super.shouldInterceptRequest(v, req);
+                }
                 @Override
                 public void onPageFinished(WebView v, String url) {
                     super.onPageFinished(v, url);
@@ -77,8 +93,8 @@ public class MainActivity extends Activity implements PurchasesUpdatedListener {
             webView.setWebChromeClient(new WebChromeClient());
             webView.addJavascriptInterface(new GameBridge(), "AndroidBridge");
 
-            // file:// مباشرة - يعمل مع file:///android_asset/
-            webView.loadUrl("file:///android_asset/index.html");
+            // تحميل عبر https - متوافق مع WebViewAssetLoader
+            webView.loadUrl("https://appassets.androidplatform.net/assets/index.html");
 
         } catch (Exception e) {
             Log.e(TAG, "WebView: " + e.getMessage());
@@ -310,4 +326,5 @@ public class MainActivity extends Activity implements PurchasesUpdatedListener {
         try { if (webView != null) { webView.destroy(); webView = null; } } catch (Exception e) {}
         super.onDestroy();
     }
-}
+                            }
+                            
