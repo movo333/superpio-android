@@ -36,7 +36,7 @@ public class MainActivity extends Activity implements PurchasesUpdatedListener {
     // WebViewAssetLoader يحمل من assets عبر https بدل file://
     private WebViewAssetLoader assetLoader;
     private WebView webView;
-    private RewardedAd rewardedAd;
+    private volatile RewardedAd rewardedAd;
     private InterstitialAd splashAd;
     private boolean adLoading = false;
     private BillingClient billingClient;
@@ -114,7 +114,8 @@ public class MainActivity extends Activity implements PurchasesUpdatedListener {
         try {
             billingClient = BillingClient.newBuilder(this)
                 .setListener(this)
-                .enablePendingPurchases()
+                .enablePendingPurchases(
+                    PendingPurchasesParams.newBuilder().enableOneTimeProducts().build())
                 .build();
             billingClient.startConnection(new BillingClientStateListener() {
                 @Override
@@ -142,11 +143,12 @@ public class MainActivity extends Activity implements PurchasesUpdatedListener {
                                 try { loadRewardedAd(); } catch (Exception e) {}
                             });
                         } else {
-                            notifyJS("onAdRewarded", rewardType);
+                            // لا يوجد إعلان جاهز: لا مكافأة
+                            notifyJS("onAdUnavailable", rewardType);
                             try { loadRewardedAd(); } catch (Exception e) {}
                         }
                     } catch (Exception e) {
-                        notifyJS("onAdRewarded", rewardType);
+                        notifyJS("onAdUnavailable", rewardType);
                     }
                 });
             } catch (Exception e) {}
@@ -184,9 +186,11 @@ public class MainActivity extends Activity implements PurchasesUpdatedListener {
                             .setProductType(BillingClient.ProductType.INAPP)
                             .build()
                     )).build();
-                billingClient.queryProductDetailsAsync(params, (result, list) -> {
+                billingClient.queryProductDetailsAsync(params, (result, queryResult) -> {
                     try {
-                        if (result.getResponseCode() != BillingClient.BillingResponseCode.OK || list.isEmpty()) {
+                        List<ProductDetails> list = queryResult.getProductDetailsList();
+                        if (result.getResponseCode() != BillingClient.BillingResponseCode.OK
+                                || list == null || list.isEmpty()) {
                             notifyJS("onPurchaseResult", "error|" + productId);
                             return;
                         }
@@ -326,5 +330,4 @@ public class MainActivity extends Activity implements PurchasesUpdatedListener {
         try { if (webView != null) { webView.destroy(); webView = null; } } catch (Exception e) {}
         super.onDestroy();
     }
-                            }
-                            
+}
