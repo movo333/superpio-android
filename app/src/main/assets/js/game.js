@@ -676,12 +676,21 @@ function onAdRewarded(rewardType) {
   if (reward) { reward(); saveLocal(); cloudSave(); }
 }
 
+// ── لا يوجد إعلان جاهز: لا مكافأة ──
+function onAdUnavailable() {
+  alert('Ad not ready yet. Please try again in a few seconds.');
+}
+
 // ── عرض إعلان مكافأة ──
 function watchAd(rewardType) {
   if (!AD_REWARDS[rewardType]) return;
 
   // APK: استخدم AdMob الحقيقي
   if (window.AndroidBridge && typeof window.AndroidBridge.showRewardedAd === 'function') {
+    if (typeof window.AndroidBridge.isAdReady === 'function' && !window.AndroidBridge.isAdReady()) {
+      onAdUnavailable();
+      return;
+    }
     window.AndroidBridge.showRewardedAd(rewardType);
     return;
   }
@@ -2336,7 +2345,7 @@ function retryLvl() {
   cancelAnimationFrame(raf);
   clearInterval(timerInt);
   gameStatus = 'idle';
-  GS.lives = 3;   // reset lives on retry
+  if (GS.lives < 1) GS.lives = 3;   // أعد 3 قلوب فقط إذا نفدت (يحافظ على القلوب المشتراة)
   setTimeout(() => startLevel(GS.curLevel), 50);
 }
 
